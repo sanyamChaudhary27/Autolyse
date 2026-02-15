@@ -9,15 +9,17 @@ from sklearn.ensemble import IsolationForest
 class OutlierAnalyzer:
     """Detect and analyze outliers in numeric columns"""
     
-    def __init__(self, df: pd.DataFrame, contamination: float = 0.1):
+    def __init__(self, df: pd.DataFrame, contamination: float = 0.1, random_state: int = 42):
         """
         Initialize outlier analyzer.
         
         Args:
             df: Input dataframe
             contamination: Expected proportion of outliers (default 0.1 = 10%)
+            random_state: Random seed for reproducibility
         """
         self.df = df
+        self.random_state = random_state
         self.numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
         self.contamination = contamination
     
@@ -77,7 +79,7 @@ class OutlierAnalyzer:
             return {}  # Not enough data for meaningful detection
         
         # Fit Isolation Forest
-        iso_forest = IsolationForest(contamination=self.contamination, random_state=42)
+        iso_forest = IsolationForest(contamination=self.contamination, random_state=self.random_state)
         outlier_predictions = iso_forest.fit_predict(numeric_data)
         anomaly_scores = iso_forest.score_samples(numeric_data)
         

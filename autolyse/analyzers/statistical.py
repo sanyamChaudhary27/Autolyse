@@ -7,8 +7,9 @@ from typing import Dict, Any
 class StatisticalAnalyzer:
     """Compute basic statistical metrics for numerical columns"""
     
-    def __init__(self, df: pd.DataFrame):
+    def __init__(self, df: pd.DataFrame, random_state: int = 42):
         self.df = df
+        self.random_state = random_state
         self.numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
     
     def analyze(self) -> Dict[str, Any]:

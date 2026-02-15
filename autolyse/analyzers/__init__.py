@@ -6,6 +6,7 @@ from .distribution import DistributionAnalyzer
 from .outliers import OutlierAnalyzer
 from .correlation import CorrelationAnalyzer
 from .relationships import RelationshipsAnalyzer
+from .advanced_insights import AdvancedInsightsAnalyzer
 
 __all__ = [
     "StatisticalAnalyzer",
@@ -14,4 +15,5 @@ __all__ = [
     "OutlierAnalyzer",
     "CorrelationAnalyzer",
     "RelationshipsAnalyzer",
+    "AdvancedInsightsAnalyzer",
 ]

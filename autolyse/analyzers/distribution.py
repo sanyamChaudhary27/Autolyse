@@ -9,8 +9,9 @@ from scipy import stats
 class DistributionAnalyzer:
     """Analyze distributions of numeric columns"""
     
-    def __init__(self, df: pd.DataFrame):
+    def __init__(self, df: pd.DataFrame, random_state: int = 42):
         self.df = df
+        self.random_state = random_state
         self.numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
         self.categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
     

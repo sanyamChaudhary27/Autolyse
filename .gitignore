@@ -133,7 +133,10 @@ dmypy.json
 .DS_Store
 Thumbs.db
 
-# Project specific
-output/
+# Project specific - ignore generated outputs but not source code
+/output_reports/
 *.html
 test_data/
+# Allow Python source files in output directory
+!autolyse/output/__init__.py
+!autolyse/output/*.py

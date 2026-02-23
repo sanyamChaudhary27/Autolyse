@@ -443,8 +443,19 @@ This session added:
 5. ✅ **Batch sampling** - 10x faster iteration on large datasets
 6. ✅ **Enhanced documentation** - ENHANCED_API.md + advanced_features.ipynb
 7. ✅ **Backward compatibility** - All v2 features are opt-in
+8. ✅ **Bug fixes** - Fixed data structure access in advanced_features.ipynb cells 16 & 18
 
 **Commits:** 3 new logical commits (feature engineering, advanced features, documentation)
+
+---
+
+## Recent Bug Fixes (Session 3)
+
+1. ✅ **Cell 18 fix** - Added missing `enable_html=True` parameter to Autolyse initialization
+2. ✅ **Cell 16 fix** - Corrected data structure access for advanced insights (nested dictionary keys)
+   - Changed `interactions[0]` to `interactions_data.get('interactions_found', [])[0]`
+   - Fixed key names: `'interaction_strength'` → `'strength'`
+   - Applied same pattern to clusters, anomalies, and temporal patterns
 
 ---
 

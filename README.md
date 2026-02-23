@@ -12,11 +12,16 @@ Generate comprehensive exploratory data analysis with intelligent chart selectio
   - Distribution analysis (histograms, KDE plots)
   - Correlation analysis (heatmaps, correlation matrices)
   - Missing value analysis
-  - Outlier detection
+  - Outlier detection (IQR + Isolation Forest)
   - Feature relationships and pair plots
+  - **Advanced multivariate insights** (feature interactions, clusters, importance)
+- **Automatic Feature Engineering**: Polynomial, interaction, ratio, and log features
 - **Dual Visualization**: Both static (Matplotlib/Seaborn) and interactive (Plotly) plots
-- **AI-Powered Insights**: Gemini API integration for 2-4 line summaries of findings
+- **AI-Powered Insights**: Gemini API integration for 2-4 line summaries of findings (with fallbacks)
 - **Flexible Output**: HTML reports or Jupyter notebook display
+- **Granular Control**: Enable/disable specific analyses for custom workflows
+- **Reproducibility**: Fixed random seeding for deterministic results
+- **Performance**: Batch sampling for 10x speedup on large datasets
 
 ## Installation
 
@@ -43,6 +48,10 @@ df = pd.read_csv('data.csv')
 # One-liner analysis (with Gemini API key from environment)
 analyser = Autolyse(html=True, api_key=os.environ.get("GEMINI_KEY"))
 analyser.analyse(df)
+
+# Access results
+results = analyser.get_analysis_results()
+insights = analyser.get_insights()
 ```
 
 ## Project Structure

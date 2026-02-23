@@ -6,7 +6,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 setup(
     name="autolyse",
     version="0.1.0",
-    author="Your Name",
+    author="Sanyam Chaudhary",
     description="Auto EDA with AI insights - Generate comprehensive exploratory data analysis with 2 lines of code",
     long_description=long_description,
     long_description_content_type="text/markdown",

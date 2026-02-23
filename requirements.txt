@@ -7,3 +7,5 @@ scikit-learn>=1.0.0
 google-generativeai>=0.3.0
 Jinja2>=3.0.0
 scipy>=1.8.0
+IPYTHON>=7.31.0
+setuptools>=65.0.0

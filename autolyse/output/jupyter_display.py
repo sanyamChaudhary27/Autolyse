@@ -25,9 +25,13 @@ class JupyterDisplay:
         markdown = "#" * level + " " + title
         display(Markdown(markdown))
     
-    def display_subheader(self, title: str) -> None:
-        """Display a subheader"""
-        self.display_header(title, level=2)
+    def display_subheader(self, title: str, level: int = 2) -> None:
+        """
+        Backwards-compatible subheader display.
+
+        Accepts an optional `level` parameter for callers that still pass it.
+        """
+        self.display_header(title, level=level)
     
     def display_text(self, text: str) -> None:
         """Display plain text"""
@@ -68,12 +72,16 @@ class JupyterDisplay:
             missing_analysis: Dictionary from MissingValuesAnalyzer.analyze()
             title: Section title
         """
+        # Skip if analysis was disabled
+        if not missing_analysis:
+            return
+            
         self.display_subheader(title)
         
         # Overall summary
-        total_missing = missing_analysis['total_missing']
-        missing_rows = missing_analysis['missing_rows']
-        completely_missing = len(missing_analysis['completely_missing_cols'])
+        total_missing = missing_analysis.get('total_missing', 0)
+        missing_rows = missing_analysis.get('missing_rows', 0)
+        completely_missing = len(missing_analysis.get('completely_missing_cols', []))
         
         summary_text = f"""
 **Overall Summary:**
@@ -84,9 +92,9 @@ class JupyterDisplay:
         display(Markdown(summary_text))
         
         # Missing percentages by column
-        if not missing_analysis['no_missing']:
+        if not missing_analysis.get('no_missing', True):
             missing_pct_df = pd.DataFrame(
-                list(missing_analysis['missing_percentage'].items()),
+                list(missing_analysis.get('missing_percentage', {}).items()),
                 columns=['Column', 'Missing %']
             ).sort_values('Missing %', ascending=False)
             missing_pct_df = missing_pct_df[missing_pct_df['Missing %'] > 0]
@@ -138,6 +146,10 @@ class JupyterDisplay:
             outlier_analysis: Dictionary from OutlierAnalyzer.get_outlier_summary()
             title: Section title
         """
+        # Skip if analysis was disabled
+        if not outlier_analysis:
+            return
+            
         self.display_subheader(title)
         
         iqr_results = outlier_analysis.get('iqr_method', {})
@@ -203,6 +215,10 @@ class JupyterDisplay:
             dist_analysis: Dictionary from DistributionAnalyzer methods
             title: Section title
         """
+        # Skip if analysis was disabled
+        if not dist_analysis:
+            return
+            
         self.display_subheader(title)
         
         # Numeric distributions

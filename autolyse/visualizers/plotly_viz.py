@@ -126,7 +126,7 @@ class PlotlyVisualizer:
             fig.add_annotation(
                 text='No Missing Values Found',
                 xref='paper', yref='paper',
-                x=0.5, y=0.5, showarrow=False, fontsize=20
+                x=0.5, y=0.5, showarrow=False, font=dict(size=20)
             )
             fig.update_layout(height=400)
             return fig
@@ -182,7 +182,7 @@ class PlotlyVisualizer:
             fig.add_annotation(
                 text='Not enough numeric columns for correlation',
                 xref='paper', yref='paper',
-                x=0.5, y=0.5, showarrow=False, fontsize=14
+                x=0.5, y=0.5, showarrow=False, font=dict(size=14)
             )
             return fig
         
@@ -282,7 +282,7 @@ class PlotlyVisualizer:
             fig.add_annotation(
                 text='No numeric columns',
                 xref='paper', yref='paper',
-                x=0.5, y=0.5, showarrow=False, fontsize=14
+                x=0.5, y=0.5, showarrow=False, font=dict(size=14)
             )
             return fig
         

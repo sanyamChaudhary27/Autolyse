@@ -8,7 +8,6 @@ import warnings
 
 warnings.filterwarnings('ignore')
 
-
 class FeatureEngineer:
     """
     Automated feature engineering with optimization.

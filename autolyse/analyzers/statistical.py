@@ -25,12 +25,13 @@ class StatisticalAnalyzer:
             - count, null_count
         """
         stats = {}
+        n_rows = max(len(self.df), 1)
         for col in self.numeric_cols:
             col_data = self.df[col].dropna()
             stats[col] = {
                 "count": len(col_data),
-                "null_count": self.df[col].isna().sum(),
-                "null_percentage": (self.df[col].isna().sum() / len(self.df)) * 100,
+                "null_count": int(self.df[col].isna().sum()),
+                "null_percentage": (self.df[col].isna().sum() / n_rows) * 100,
                 "mean": col_data.mean(),
                 "median": col_data.median(),
                 "std": col_data.std(),

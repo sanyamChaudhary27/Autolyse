@@ -1,17 +1,25 @@
 """Relationships analysis module"""
 
-import pandas as pd
 import numpy as np
-from typing import Dict, Any, List
+import pandas as pd
+from scipy.stats import chi2_contingency
+
+
+#: Categorical pairs with more levels than this on either side are skipped:
+#: their contingency tables are unreadable and chi-square approximations break.
+MAX_CATEGORICAL_LEVELS = 30
 
 
 class RelationshipsAnalyzer:
     """Analyze relationships between variables"""
-    
+
     def __init__(self, df: pd.DataFrame):
         self.df = df
         self.numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-        self.categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
+        self.categorical_cols = [
+            c for c in df.columns
+            if df[c].dtype.name in ("object", "str", "category")
+        ]
     
     def analyze_categorical_numeric_relationships(self) -> Dict[str, Any]:
         """
@@ -22,44 +30,50 @@ class RelationshipsAnalyzer:
             impact on numeric variables (groupby statistics)
         """
         relationships = {}
-        
+
         for cat_col in self.categorical_cols:
+            if self.df[cat_col].nunique() > MAX_CATEGORICAL_LEVELS:
+                continue  # group tables would be unreadably large
+
             relationships[cat_col] = {}
-            
+
             # For each numeric column, get grouped statistics
             for num_col in self.numeric_cols:
                 grouped = self.df.groupby(cat_col)[num_col].agg([
                     'count', 'mean', 'median', 'std', 'min', 'max'
                 ]).to_dict('index')
-                
+
                 relationships[cat_col][num_col] = grouped
-        
+
         return relationships
     
     def analyze_categorical_relationships(self) -> Dict[str, Any]:
         """
         Analyze relationships between categorical variables using cross-tabulation.
-        
+
         Returns:
-            Dictionary with contingency tables for pairs of categorical variables
+            Dictionary with contingency tables and Cramér's V for each pair
+            of categorical variables. Pairs exceeding ``MAX_CATEGORICAL_LEVELS``
+            on either side are reported with ``cramers_v: None``.
         """
         relationships = {}
-        
+
         for i, col1 in enumerate(self.categorical_cols):
             for col2 in self.categorical_cols[i+1:]:
-                # Create cross-tabulation
+                levels_ok = (
+                    self.df[col1].nunique() <= MAX_CATEGORICAL_LEVELS
+                    and self.df[col2].nunique() <= MAX_CATEGORICAL_LEVELS
+                )
                 crosstab = pd.crosstab(self.df[col1], self.df[col2])
-                
-                # Calculate Cramér's V statistic (measure of association)
-                chi2 = self._cramers_v(self.df[col1], self.df[col2])
-                
+                cramers_v = self._cramers_v(self.df[col1], self.df[col2]) if levels_ok else None
+
                 key = f"{col1}_vs_{col2}"
                 relationships[key] = {
                     "crosstab": crosstab.to_dict(),
-                    "cramers_v": chi2,
+                    "cramers_v": cramers_v,
                     "shape": crosstab.shape,
                 }
-        
+
         return relationships
     
     def analyze_numeric_numeric_relationships(self) -> Dict[str, Any]:
@@ -114,22 +128,30 @@ class RelationshipsAnalyzer:
     def _cramers_v(col1: pd.Series, col2: pd.Series) -> float:
         """
         Calculate Cramér's V statistic for categorical association.
-        
+
+        Uses the standard definition V = sqrt(chi2 / (n * min(r-1, c-1)))
+        with chi2 from a proper contingency-table chi-square test.
+
         Args:
             col1: First categorical column
             col2: Second categorical column
-        
+
         Returns:
-            Cramér's V statistic (0 to 1)
+            Cramér's V statistic (0 = independence, 1 = perfect association)
         """
         confusion_matrix = pd.crosstab(col1, col2)
-        chi2 = ((confusion_matrix.values ** 2) / confusion_matrix.sum().sum()).sum() - 1
+        if min(confusion_matrix.shape) < 2 or len(col1) == 0:
+            return 0.0
+
+        try:
+            # correction=False keeps the textbook V definition; Yates' default
+            # would bias 2x2 tables below 1.0 even under perfect association.
+            chi2 = chi2_contingency(confusion_matrix, correction=False)[0]
+        except ValueError:
+            return 0.0
+
         min_dim = min(confusion_matrix.shape) - 1
-        
-        if min_dim == 0:
-            return 0
-        
-        return np.sqrt(chi2 / (len(col1) * min_dim))
+        return float(np.sqrt(chi2 / (len(col1) * min_dim)))
     
     @staticmethod
     def _get_strength_label(correlation: float) -> str:

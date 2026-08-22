@@ -32,10 +32,11 @@ class MissingValuesAnalyzer:
             "completely_missing_cols": [],
             "no_missing": False
         }
-        
+        n_rows = max(len(self.df), 1)
+
         for col in self.all_cols:
             missing = self.df[col].isna().sum()
-            missing_pct = (missing / len(self.df)) * 100
+            missing_pct = (missing / n_rows) * 100
             
             analysis["missing_count"][col] = missing
             analysis["missing_percentage"][col] = missing_pct

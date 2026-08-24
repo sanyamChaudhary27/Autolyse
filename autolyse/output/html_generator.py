@@ -52,16 +52,27 @@ class HTMLGenerator:
 
     def generate_report(self, analyses: dict, insights: dict | None = None,
                         filename: str = "autolyse_report.html",
-                        figures: dict | None = None) -> str:
+                        figures: dict | None = None,
+                        findings: list | None = None,
+                        health_score=None,
+                        target_analysis: dict | None = None) -> str:
         """Build and save the report; returns the output path."""
         body = [
             self._dataset_summary_section(),
+        ]
+        if health_score is not None:
+            body.append(self._health_score_section(health_score))
+        if findings is not None:
+            body.append(self._findings_section(findings))
+        body.extend([
             self._statistics_section(analyses.get("statistics", {})),
             self._missing_values_section(analyses.get("missing_values", {})),
             self._distribution_section(analyses.get("distributions", {})),
             self._correlation_section(analyses.get("correlations", {})),
             self._outliers_section(analyses.get("outliers", {})),
-        ]
+        ])
+        if target_analysis:
+            body.append(self._target_section(target_analysis))
         if self.embed_charts and figures:
             body.append(self._visualizations_section(figures))
         body.append(self._insights_section(insights or {}))

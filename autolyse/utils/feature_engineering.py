@@ -1,5 +1,7 @@
 """Automated feature engineering module."""
 
+from typing import Optional
+
 import numpy as np
 import pandas as pd
 
@@ -183,7 +185,7 @@ class FeatureEngineer:
             "all_features": list(self.engineered_features.keys()),
         }
 
-    def select_best_features(self, target_col: str | None = None,
+    def select_best_features(self, target_col: Optional[str] = None,
                              n_features: int = 10) -> list:
         """Rank engineered features by target correlation or variance."""
         engineered_only = [c for c in self.df.columns if c in self.engineered_features]

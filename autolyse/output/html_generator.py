@@ -1,5 +1,7 @@
 """HTML report generation module."""
 
+from typing import Optional
+
 import html as html_module
 from datetime import datetime
 from pathlib import Path
@@ -60,12 +62,12 @@ class HTMLGenerator:
 
     # ------------------------------------------------------------------ API
 
-    def generate_report(self, analyses: dict, insights: dict | None = None,
+    def generate_report(self, analyses: dict, insights: Optional[dict] = None,
                         filename: str = "autolyse_report.html",
-                        figures: dict | None = None,
-                        findings: list | None = None,
+                        figures: Optional[dict] = None,
+                        findings: Optional[list] = None,
                         health_score=None,
-                        target_analysis: dict | None = None) -> str:
+                        target_analysis: Optional[dict] = None) -> str:
         """Build and save the report; returns the output path."""
         body = [
             self._dataset_summary_section(),

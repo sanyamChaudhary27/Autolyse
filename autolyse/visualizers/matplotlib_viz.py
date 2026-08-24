@@ -263,12 +263,18 @@ class MatplotlibVisualizer:
 
         with _plot_style():
             fig, ax = plt.subplots(figsize=self.figsize)
-            grouped = [g[num_col].dropna().to_numpy()
-                       for _, g in self.df.groupby(cat_col) if g[num_col].notna().any()]
-            labels = [str(k) for k, g in self.df.groupby(cat_col)
-                      if g[num_col].notna().any()]
+            grouped, labels = [], []
+            for key, group in self.df.groupby(cat_col):
+                values = group[num_col].dropna().to_numpy()
+                if len(values):
+                    grouped.append(values)
+                    labels.append(str(key))
 
-            ax.boxplot(grouped, tick_labels=labels) if grouped else None
+            if grouped:
+                ax.boxplot(grouped)
+                # set_xticklabels works across matplotlib versions where the
+                # boxplot(tick_labels=...) kwarg does not (< 3.9).
+                ax.set_xticklabels(labels)
             ax.set_title(f"{num_col} by {cat_col}", fontsize=14, fontweight="bold")
             ax.set_xlabel(cat_col, fontsize=11)
             ax.set_ylabel(num_col, fontsize=11)

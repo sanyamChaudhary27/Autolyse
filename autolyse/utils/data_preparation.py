@@ -24,10 +24,15 @@ def infer_object_series_type(series: pd.Series) -> str:
     # Datetime: parsing must succeed on essentially the whole sample; plain
     # words like "free"/"pro" never parse, numbers-as-dates are rejected.
     if is_string_dtype(col):
-        parsed = pd.to_datetime(col.head(DATETIME_PARSE_SAMPLE), errors="coerce",
-                                format="mixed")
-        if parsed.notna().mean() >= 0.9:
-            return "datetime"
+        try:
+            parsed = pd.to_datetime(col.head(DATETIME_PARSE_SAMPLE),
+                                    errors="coerce", format="mixed")
+            if parsed.notna().mean() >= 0.9:
+                return "datetime"
+        except (ValueError, TypeError):
+            # format="mixed" needs pandas >= 2.0; older stacks just skip
+            # datetime inference for strings.
+            pass
 
     unique_ratio = col.nunique() / len(col)
     if unique_ratio < TEXT_UNIQUE_RATIO:

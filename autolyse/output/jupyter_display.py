@@ -4,10 +4,22 @@ import numpy as np
 import pandas as pd
 
 try:
-    from IPython.display import HTML, Markdown, clear_output, display
+    from IPython.display import Markdown, clear_output, display
     _IPYTHON_AVAILABLE = True
-except ImportError:  # pragma: no cover
+except ImportError:  # IPython is optional; CLI runs get plain-text output.
     _IPYTHON_AVAILABLE = False
+
+    class Markdown(str):
+        """Stand-in so code paths can construct markup without IPython."""
+
+        def __repr__(self):
+            return str(self)
+
+    def display(*args, **kwargs):  # noqa: D401 - matches IPython's signature
+        """No-op sink replacing IPython.display.display."""
+
+    def clear_output(*args, **kwargs):
+        """No-op sink replacing IPython.display.clear_output."""
 
 
 def _in_kernel() -> bool:

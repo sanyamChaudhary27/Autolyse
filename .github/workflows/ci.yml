@@ -27,4 +27,33 @@ jobs:
           pip install -e ".[dev]"
 
       - name: Run test suite
-        run: pytest -q
+        run: |
+          set -o pipefail
+          python -m pytest -q --tb=short 2>&1 | tee pytest_output.txt
+
+      - name: Report environment
+        if: always()
+        run: |
+          python - <<'EOF'
+          import sys
+          import matplotlib, numpy, pandas, plotly, scipy, seaborn, sklearn
+          print(f"python {sys.version}")
+          for m in (matplotlib, numpy, pandas, plotly, scipy, seaborn, sklearn):
+              print(m.__name__, m.__version__)
+          EOF
+
+      - name: Surface failures as annotations
+        if: failure()
+        run: |
+          # Emit the most informative lines as readable GitHub annotations.
+          grep -nE "ERROR|FAILED|Error|Traceback|raise |assert" pytest_output.txt | head -n 40 > key_lines.txt
+          summary=$(tail -n 12 pytest_output.txt)
+          {
+            echo "--- KEY LINES ---"
+            cat key_lines.txt
+            echo "--- TAIL ---"
+            echo "$summary"
+          } | while IFS= read -r line; do
+            printf '%s\n' "$line" | head -c 900
+            echo
+          done | sed 's/^/::error::/'

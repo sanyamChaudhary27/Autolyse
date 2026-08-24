@@ -386,11 +386,24 @@ class FindingsEngine:
         self.target = target
         self.random_seed = random_seed
 
+        # Fall back to dtype-based grouping so the engine works even when
+        # callers do not supply type information.
         types = column_types or {}
+        numeric_cols = types.get("numeric")
+        categorical_cols = types.get("categorical")
+        text_cols = types.get("text")
+        if numeric_cols is None:
+            numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+        if categorical_cols is None:
+            categorical_cols = [c for c in df.columns
+                                if df[c].dtype.name in ("object", "str", "category")]
+        if text_cols is None:
+            text_cols = []
+
         self._ctx = {
-            "numeric_cols": types.get("numeric", []),
-            "categorical_cols": types.get("categorical", []),
-            "text_cols": types.get("text", []),
+            "numeric_cols": [c for c in numeric_cols if c != target],
+            "categorical_cols": [c for c in categorical_cols if c != target],
+            "text_cols": text_cols,
             "datetime_cols": types.get("datetime", []),
             "analyses": self.analyses,
             "target": target,

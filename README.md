@@ -1,83 +1,94 @@
 # Autolyse
 
-Auto Exploratory Data Analysis (EDA) with AI-powered insights.
-
-Generate comprehensive exploratory data analysis with intelligent chart selection, missing value analysis, outlier detection, and AI-summarized findings - all in just **2 lines of code**.
-
-## Features
-
-- **Smart Data Type Detection**: Automatically identifies numerical, categorical, datetime, and text columns
-- **Comprehensive Analysis**:
-  - Basic statistics (mean, median, std, skewness, kurtosis)
-  - Distribution analysis (histograms, KDE plots)
-  - Correlation analysis (heatmaps, correlation matrices)
-  - Missing value analysis
-  - Outlier detection (IQR + Isolation Forest)
-  - Feature relationships and pair plots
-  - **Advanced multivariate insights** (feature interactions, clusters, importance)
-- **Automatic Feature Engineering**: Polynomial, interaction, ratio, and log features
-- **Dual Visualization**: Both static (Matplotlib/Seaborn) and interactive (Plotly) plots
-- **AI-Powered Insights**: Gemini API integration for 2-4 line summaries of findings (with fallbacks)
-- **Flexible Output**: HTML reports or Jupyter notebook display
-- **Granular Control**: Enable/disable specific analyses for custom workflows
-- **Reproducibility**: Fixed random seeding for deterministic results
-- **Performance**: Batch sampling for 10x speedup on large datasets
-
-## Installation
-
-```bash
-pip install -r requirements.txt
-```
-
-Or with setup.py:
-
-```bash
-python setup.py install
-```
-
-## Quick Start
+**Prescriptive automated EDA** - not just a report, a diagnosis.
 
 ```python
-import os
 from autolyse import Autolyse
 import pandas as pd
 
-# Load your data
-df = pd.read_csv('data.csv')
-
-# One-liner analysis (with Gemini API key from environment)
-analyser = Autolyse(html=True, api_key=os.environ.get("GEMINI_KEY"))
-analyser.analyse(df)
-
-# Access results
-results = analyser.get_analysis_results()
-insights = analyser.get_insights()
+Autolyse(target="churn").analyse(pd.read_csv("customers.csv"))
 ```
 
-## Project Structure
+One call produces:
 
+- **Data Health Score** - explainable 0-100 score with per-dimension breakdown
+  (completeness, uniqueness, validity, modeling-readiness)
+- **Ranked findings** - linter-style diagnostics, each with severity, the exact
+  evidence, and a copy-paste pandas fix (missing columns, duplicates, leakage,
+  imbalance, skew, high cardinality...)
+- **Target-aware analysis** - predictive power ranking for every feature plus
+  leakage detection that flags features that know the answer too well
+- **Interactive HTML report** - fully self-contained single file (charts work
+  offline), or rich Jupyter display
+- **Classic EDA** - statistics, distributions, correlations, outliers,
+  relationships - all type-safe on pandas 2.x and 3.x
+
+## Install
+
+```bash
+pip install -e .
 ```
-autolyse/
-├── analyzers/          # Statistical analysis modules
-├── visualizers/        # Visualization modules (matplotlib, plotly)
-├── utils/              # Utility functions and helpers
-├── output/             # Output handlers (HTML, Jupyter)
-└── core.py            # Main Autolyse class
+
+Optional AI narration (polishes insights via Gemini - never required):
+
+```bash
+pip install -e ".[ai]"
 ```
 
-## Requirements
+## What makes it different
 
-- Python >= 3.8
-- pandas, numpy
-- matplotlib, seaborn, plotly
-- scikit-learn
-- google-generativeai
-- scipy
+| Typical auto-EDA | Autolyse |
+|---|---|
+| "Column X has 43% missing" | "[HIGH] X is 43% missing -> imputation injects assumptions; here's when to drop vs impute + code" |
+| Pretty charts | Charts **plus** a fix list ordered by what blocks your model first |
+| Correlation tables | Predictive-power ranking vs your target + leakage suspects |
+| Works only offline by accident | Deterministic engine always works; LLM narration is opt-in polish |
+
+## API tour
+
+```python
+from autolyse import Autolyse
+
+an = Autolyse(html=True, target="price")   # prescriptive + report
+results = an.analyse(df)
+
+an.get_findings()        # [Finding(rule_id='COL_HIGH_MISSING', ...), ...]
+an.get_health_score()    # HealthScore(overall=87, grade='B', by_category={...})
+an.get_analysis_results()# raw analyses dict
+an.df                    # working frame (sampled / feature-engineered)
+```
+
+Large data? Analyze a reproducible sample:
+
+```python
+Autolyse(batch_size=5000, random_seed=42).analyse(huge_df)
+```
+
+Custom LLM narration (any provider):
+
+```python
+class MyProvider:
+    def complete(self, prompt: str) -> str | None:
+        ...
+
+Autolyse(llm_provider=MyProvider()).analyse(df)
+```
+
+Granular control (all stages toggleable): `enable_statistics`,
+`enable_missing_values`, `enable_distributions`, `enable_outliers`,
+`enable_correlations`, `enable_relationships`, `enable_advanced_insights`,
+`enable_feature_engineering`, `enable_visualizations`.
+
+## Development
+
+```bash
+pip install -e ".[dev]"
+pytest
+```
+
+Python >= 3.9. Core deps: pandas, numpy, scipy, scikit-learn, matplotlib,
+seaborn, plotly.
 
 ## License
 
-MIT
-
-## Author
-
-Sanyam Chaudhary
+MIT - see [LICENSE](LICENSE).

@@ -213,10 +213,13 @@ class Narrator:
             return sections
         refined = {}
         for title, text in sections.items():
-            improved = self.provider.complete(
-                f"Rewrite this data-analysis finding for a business reader in "
-                f"at most 4 sentences. Keep every number exactly as given.\n\n"
-                f"SECTION: {title}\n{text}"
-            )
+            try:
+                improved = self.provider.complete(
+                    f"Rewrite this data-analysis finding for a business reader "
+                    f"in at most 4 sentences. Keep every number exactly as "
+                    f"given.\n\nSECTION: {title}\n{text}"
+                )
+            except Exception:
+                improved = None
             refined[title] = improved if improved else text
         return refined

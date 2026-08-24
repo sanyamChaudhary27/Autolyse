@@ -16,19 +16,23 @@ from autolyse.analyzers import (
     RelationshipsAnalyzer,
     StatisticalAnalyzer,
 )
+from autolyse.findings import FindingsEngine
+from autolyse.insights import GeminiProvider, InsightEngine, Narrator
 from autolyse.output import HTMLGenerator, JupyterDisplay
 from autolyse.output.jupyter_display import _in_kernel
-from autolyse.utils import DataPreparation, FeatureEngineer, GeminiInsights
+from autolyse.target_aware import TargetAnalyzer
+from autolyse.utils import DataPreparation, FeatureEngineer
 from autolyse.visualizers import MatplotlibVisualizer, PlotlyVisualizer
 
 
 class Autolyse:
-    """Automated EDA with prescriptive findings and optional AI narration.
+    """Prescriptive automated EDA: findings, health score and charts.
 
     Usage:
         >>> import pandas as pd
         >>> from autolyse import Autolyse
-        >>> analyser = Autolyse(html=False)
+        >>> analyser = Autolyse(html=False)          # descriptive EDA
+        >>> analyser = Autolyse(target="churn")      # + prescriptive layer
         >>> results = analyser.analyse(df)
     """
 
@@ -40,16 +44,22 @@ class Autolyse:
                  enable_advanced_insights: bool = True,
                  enable_feature_engineering: bool = False,
                  enable_visualizations: bool = True, enable_html: bool = True,
-                 batch_size: Optional[int] = None):
+                 batch_size: Optional[int] = None,
+                 target: Optional[str] = None,
+                 llm_provider=None):
         """
         Args:
             html: Generate an HTML report instead of notebook display.
-            api_key: Gemini API key (or set GEMINI_KEY env var). Optional -
-                deterministic summaries are used without one.
+            api_key: Gemini API key for optional LLM narration (or set
+                GEMINI_KEY env var). All analysis works fully offline without it.
             output_dir: Directory for HTML reports.
-            random_seed: Seed for sampling, outlier models and feature engineering.
+            random_seed: Seed for sampling and stochastic steps.
             enable_*: Granular switches for each analysis stage.
             batch_size: Analyze a reproducible random sample of N rows.
+            target: Optional target column - activates predictive-power
+                ranking, leakage detection and imbalance findings.
+            llm_provider: Optional object with ``complete(prompt)->str``.
+                Defaults to GeminiProvider when api_key is given.
         """
         if batch_size is not None and batch_size <= 0:
             raise ValueError("batch_size must be a positive integer")
@@ -58,7 +68,10 @@ class Autolyse:
         self.api_key = api_key
         self.output_dir = Path(output_dir)
         self.random_seed = random_seed
-        self.insights_generator = GeminiInsights(api_key=api_key)
+        self.target = target
+        self.narrator = Narrator(llm_provider or
+                                 (GeminiProvider(api_key=api_key)
+                                  if api_key else None))
 
         self.enable_statistics = enable_statistics
         self.enable_missing_values = enable_missing_values
@@ -79,6 +92,9 @@ class Autolyse:
         self.analyses: Dict[str, Any] = {}
         self.insights: Dict[str, str] = {}
         self.figures: Dict[str, Dict] = {}
+        self.findings: list = []
+        self.health_score = None
+        self.target_analysis: Optional[Dict[str, Any]] = None
         self._is_jupyter = _in_kernel()
 
     # ------------------------------------------------------------------ API
@@ -91,6 +107,8 @@ class Autolyse:
                             f"got {type(df).__name__}")
         if df.empty:
             raise ValueError("Cannot analyse an empty DataFrame")
+        if self.target is not None and self.target not in df.columns:
+            raise ValueError(f"Target column '{self.target}' not found in DataFrame")
 
         # One copy doubles as both original reference and working frame;
         # sampling (below) replaces only the working frame.
@@ -134,6 +152,27 @@ class Autolyse:
                 progress(f"Running {self._count_enabled_analyzers()} analyzers")
                 self.analyses = self._run_all_analyzers()
 
+            if "target" in steps:
+                progress("Analyzing target relationships")
+                try:
+                    analyzer = TargetAnalyzer(
+                        self.df, self.target,
+                        column_types=self._grouped_types(),
+                    )
+                    self.target_analysis = analyzer.analyze()
+                    self.analyses["target_analysis"] = self.target_analysis
+                except Exception as error:
+                    warnings.warn(f"Target analysis skipped: {error}")
+
+            progress("Scoring data health")
+            engine = FindingsEngine(
+                self.df, column_types=self._grouped_types(),
+                analyses=self.analyses, target=self.target,
+                random_seed=self.random_seed,
+            )
+            self.findings = engine.run()
+            self.health_score = engine.health_score(self.findings)
+
             if "visualize" in steps:
                 progress("Generating visualizations")
                 self._generate_visualizations()
@@ -165,6 +204,14 @@ class Autolyse:
         """Get generated insight texts."""
         return self.insights.copy()
 
+    def get_findings(self) -> list:
+        """Get ranked prescriptive findings (Finding dataclasses)."""
+        return list(self.findings)
+
+    def get_health_score(self):
+        """Get the HealthScore (overall, grade, per-category)."""
+        return self.health_score
+
     def get_dataframe_info(self) -> Optional[pd.DataFrame]:
         """Detailed per-column information (None before analyse())."""
         if self.data_prep is not None:
@@ -187,11 +234,15 @@ class Autolyse:
         steps = ["prepare"]
         if self.enable_feature_engineering:
             steps.append("engineer")
-        if any([self.enable_statistics, self.enable_missing_values,
-                self.enable_distributions, self.enable_outliers,
-                self.enable_correlations, self.enable_relationships,
-                self.enable_advanced_insights]):
+        has_analyzers = any([self.enable_statistics, self.enable_missing_values,
+                             self.enable_distributions, self.enable_outliers,
+                             self.enable_correlations, self.enable_relationships,
+                             self.enable_advanced_insights])
+        if has_analyzers:
             steps.append("analyze")
+        if self.target is not None:
+            steps.append("target")
+        steps.append("findings")
         if self.enable_visualizations:
             steps.append("visualize")
         steps.append("insights")
@@ -303,65 +354,27 @@ class Autolyse:
                     self.figures["plotly"]["outliers"][col] = fig_plotly
 
     def _generate_ai_insights(self) -> Dict[str, str]:
-        """Build insights section-by-section.
+        """Deterministic narratives, optionally polished by the LLM provider."""
+        engine = InsightEngine(
+            df=self.df,
+            analyses=self.analyses,
+            findings=self.findings,
+            health_score=self.health_score,
+            validation=self.validation,
+            target_analysis=self.target_analysis,
+        )
+        return self.narrator.polish(engine.build())
 
-        Each block depends only on analyses that actually ran - previously a
-        single disabled analyzer raised KeyError and silently discarded ALL
-        insights.
-        """
-        insights = {}
-        generator = self.insights_generator
-        a = self.analyses
-
-        def add(key, producer):
-            try:
-                text = producer()
-                if text:
-                    insights[key] = text
-            except Exception as error:
-                warnings.warn(f"Could not generate '{key}' insight: {error}")
-
-        if "statistics" in a:
-            def stats_text():
-                cols = [c for c in self.data_prep.get_numeric_columns()
-                        if c in a["statistics"]][:3]
-                return "\n\n".join(
-                    generator.generate_statistics_insight(a["statistics"][col], col)
-                    for col in cols
-                )
-            add("Statistics", stats_text)
-
-        if "missing_values" in a:
-            add("Data Quality",
-                lambda: generator.generate_missing_values_insight(
-                    a["missing_values"]))
-
-        if "correlations" in a:
-            pearson = a["correlations"].get("pearson", {})
-            add("Correlations",
-                lambda: generator.generate_correlation_insight(
-                    pearson.get("strong_correlations", []),
-                    pearson.get("moderate_correlations", [])))
-
-        if "outliers" in a:
-            add("Outliers",
-                lambda: generator.generate_outlier_insight(
-                    a["outliers"].get("iqr_method", {}),
-                    a["outliers"].get("isolation_forest", {})))
-
-        if "distributions" in a:
-            add("Distributions",
-                lambda: generator.generate_distribution_insight(
-                    a["distributions"].get("numeric_distributions", {}),
-                    a["distributions"].get("categorical_distributions", {})))
-
-        add("Dataset Overview",
-            lambda: generator.generate_general_insight(
-                tuple(self.df.shape),
-                self.validation.get("column_types", {}),
-                self.validation.get("data_quality_score", 0)))
-
-        return insights
+    def _grouped_types(self) -> Dict[str, list]:
+        if self.data_prep is None:
+            return {}
+        return {
+            "numeric": self.data_prep.get_numeric_columns(),
+            "categorical": self.data_prep.get_categorical_columns(),
+            "text": self.data_prep.get_text_columns(),
+            "datetime": self.data_prep.get_datetime_columns(),
+            "boolean": self.data_prep.get_boolean_columns(),
+        }
 
     def _generate_html_report(self) -> str:
         generator = HTMLGenerator(self.df, output_dir=str(self.output_dir))
@@ -370,12 +383,36 @@ class Autolyse:
             insights=self.insights,
             filename="autolyse_report.html",
             figures=self.figures.get("plotly", {}),
+            findings=self.findings,
+            health_score=self.health_score,
+            target_analysis=self.target_analysis,
         )
 
     def _display_jupyter_output(self) -> None:
         view = JupyterDisplay()
 
         view.display_header("Automated EDA Analysis - Autolyse", level=1)
+
+        if self.health_score is not None:
+            cats = " | ".join(f"{k}: {v}" for k, v in
+                              (self.health_score.by_category or {}).items())
+            text = (f"**Health Score: {self.health_score.overall}/100 "
+                    f"(grade {self.health_score.grade})**"
+                    + (f"  \n{cats}" if cats else ""))
+            view.display_text(text)
+
+        if self.findings:
+            view.display_subheader("Findings", level=2)
+            for finding in self.findings[:10]:
+                marker = finding.severity.value.upper()
+                line = f"**[{marker}]** {finding.title} - {finding.detail}"
+                if finding.fix_snippet:
+                    line += f"  \n```python\n{finding.fix_snippet}\n```"
+                view.display_text(line)
+            if len(self.findings) > 10:
+                view.display_text(
+                    f"... {len(self.findings) - 10} more findings in the report.")
+
         view.display_summary(self.df)
 
         if self.data_prep is not None:

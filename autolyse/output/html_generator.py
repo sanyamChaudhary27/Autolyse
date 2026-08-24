@@ -24,6 +24,16 @@ def _escape(value) -> str:
     return html_module.escape(text, quote=False)
 
 
+def _score_color(score: float) -> str:
+    if score >= 90:
+        return "#388e3c"
+    if score >= 70:
+        return "#fbc02d"
+    if score >= 50:
+        return "#f57c00"
+    return "#d32f2f"
+
+
 class HTMLGenerator:
     """Generate self-contained HTML reports from analysis results."""
 
@@ -120,6 +130,11 @@ class HTMLGenerator:
 <title>Autolyse - EDA Report</title>
 {plotly_tag}
 {self._styles()}
+<script>
+function copyFix(i) {{
+  navigator.clipboard.writeText(document.getElementById('fix' + i).innerText);
+}}
+</script>
 </head>"""
 
     def _render_figure(self, fig, height: int = 420) -> str:
@@ -189,6 +204,40 @@ tr:hover { background: #f0f0f0; }
 .footer { background: white; padding: 2rem; text-align: center; color: #666;
           border-top: 1px solid #eee; margin-top: 3rem; }
 .no-data { text-align: center; padding: 2rem; color: #999; font-style: italic; }
+.score-wrap { display: flex; gap: 2rem; align-items: center; flex-wrap: wrap; }
+.score-hero { border: 4px solid #667eea; border-radius: 12px; padding: 1rem 2.5rem;
+              text-align: center; }
+.score-number { font-size: 56px; font-weight: 800; line-height: 1; }
+.score-grade { font-size: 18px; color: #555; margin-top: .25rem; }
+.score-sub { font-size: 12px; color: #999; }
+.score-cats { flex: 1; min-width: 280px; display: grid;
+              grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: .75rem; }
+.score-cat { display: grid; grid-template-columns: 110px 1fr 40px;
+             align-items: center; gap: .5rem; font-size: 14px; }
+.bar { background: #eee; border-radius: 6px; height: 10px; overflow: hidden; }
+.fill { height: 100%; }
+.finding { border-left: 5px solid #999; background: #fafafa; border-radius: 6px;
+           padding: 1rem 1.25rem; margin: .9rem 0; }
+.finding.sev-critical { border-color: #d32f2f; background: #fdecea; }
+.finding.sev-high { border-color: #f57c00; background: #fff3e0; }
+.finding.sev-medium { border-color: #fbc02d; background: #fffde7; }
+.finding.sev-low { border-color: #1976d2; background: #e3f2fd; }
+.finding-head { display: flex; align-items: center; gap: .6rem; margin-bottom: .35rem; }
+.sev-badge { font-size: 11px; font-weight: 700; letter-spacing: .05em;
+             padding: 2px 8px; border-radius: 10px; color: white; background: #777; }
+.sev-critical .sev-badge { background: #d32f2f; }
+.sev-high .sev-badge { background: #f57c00; }
+.sev-medium .sev-badge { background: #fbc02d; color: #333; }
+.sev-low .sev-badge { background: #1976d2; }
+.cols { color: #776; font-size: 13px; }
+.count-badge { background: #667eea; color: white; border-radius: 12px;
+               font-size: 14px; padding: 2px 12px; vertical-align: middle; }
+details summary { cursor: pointer; color: #455; margin-top: .4rem; }
+pre { background: #263238; color: #eceff1; padding: .8rem; border-radius: 6px;
+      overflow-x: auto; font-size: 13px; margin: .5rem 0; }
+.copy-btn { background: #667eea; border: none; color: white; padding: 4px 14px;
+            border-radius: 4px; cursor: pointer; font-size: 12px; }
+.copy-btn:hover { background: #764ba2; }
 </style>"""
 
     # ------------------------------------------------------------- sections
@@ -197,6 +246,78 @@ tr:hover { background: #f0f0f0; }
         return f"""<nav class="navbar"><div class="container">
 <h1>Autolyse</h1><span class="navbar-time">Generated: {self.timestamp}</span>
 </div></nav>"""
+
+    def _health_score_section(self, health_score) -> str:
+        cats = "".join(
+            f"<div class='score-cat'><span>{_escape(name)}</span>"
+            f"<div class='bar'><div class='fill' style='width:{value}%;"
+            f"background:{_score_color(value)}'></div></div>"
+            f"<b>{value}</b></div>"
+            for name, value in health_score.by_category.items()
+        )
+        return f"""<section class='section' id='health'>
+<h2>Data Health Score</h2>
+<div class='score-wrap'>
+  <div class='score-hero' style='border-color:{_score_color(health_score.overall)}'>
+    <div class='score-number' style='color:{_score_color(health_score.overall)}'>{health_score.overall}</div>
+    <div class='score-grade'>grade {health_score.grade}</div>
+    <div class='score-sub'>weighted across {len(health_score.by_category or {}) or 4} dimensions</div>
+  </div>
+  <div class='score-cats'>{cats}</div>
+</div>
+</section>"""
+
+    def _findings_section(self, findings: list) -> str:
+        if not findings:
+            return ("<section class='section'><h2>Findings</h2>"
+                    "<div class='alert alert-success'>No issues detected.</div>"
+                    "</section>")
+        cards = []
+        for i, f in enumerate(findings):
+            snippet = ""
+            if f.fix_snippet:
+                snippet = (
+                    f"<details><summary>Suggested fix</summary>"
+                    f"<pre id='fix{i}'><code>{_escape(f.fix_snippet)}</code></pre>"
+                    f"<button class='copy-btn' onclick=\"copyFix({i})\">Copy</button>"
+                    f"</details>"
+                )
+            cols = ", ".join(f"'{_escape(c)}'" for c in f.columns)
+            cards.append(f"""
+<div class='finding sev-{f.severity.value}'>
+  <div class='finding-head'>
+    <span class='sev-badge'>{f.severity.value.upper()}</span>
+    <b>{_escape(f.title)}</b>
+  </div>
+  <p>{_escape(f.detail)}</p>
+  {f"<p class='cols'>Columns: {cols}</p>" if cols else ''}
+  {snippet}
+</div>""")
+        return (f"<section class='section'><h2>Findings "
+                f"<span class='count-badge'>{len(findings)}</span></h2>"
+                f"{''.join(cards)}</section>")
+
+    def _target_section(self, target_analysis: dict) -> str:
+        summary = target_analysis.get("target_summary", {})
+        powers = target_analysis.get("predictive_power", {})
+        rows = [{
+            "Feature": name,
+            "Power": round(info["strength"], 3),
+            "Relation": info["relation"],
+        } for name, info in list(powers.items())[:15]]
+        suspects = target_analysis.get("leakage_suspects") or []
+        alert = ""
+        if suspects:
+            names = ", ".join(s["feature"] for s in suspects[:5])
+            alert = (f"<div class='alert alert-warning'><b>Possible leakage:</b> "
+                     f"{_escape(names)} predict '{_escape(summary.get('column'))}' "
+                     f"near-perfectly. Verify provenance before modeling.</div>")
+        return f"""<section class='section'><h2>Target Analysis</h2>
+{alert}
+<p>Target: <b>{_escape(summary.get('column'))}</b> ({_escape(summary.get('kind'))})</p>
+<h3>Predictive Power Ranking</h3>
+{self._dataframe_to_html_table(pd.DataFrame(rows)) if rows else '<p class=no-data>No features to rank</p>'}
+</section>"""
 
     def _dataset_summary_section(self) -> str:
         n_rows, n_cols = self.df.shape

@@ -1,5 +1,7 @@
 """Relationships analysis module"""
 
+from typing import Any, Dict
+
 import numpy as np
 import pandas as pd
 from scipy.stats import chi2_contingency

@@ -1,8 +1,7 @@
 """Missing values analysis module"""
 
 import pandas as pd
-import numpy as np
-from typing import Dict, Any, List
+from typing import Dict, Any
 
 
 class MissingValuesAnalyzer:

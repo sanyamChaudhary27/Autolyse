@@ -6,7 +6,6 @@ import pytest
 
 from autolyse import Autolyse
 from autolyse.findings import FindingsEngine, HealthScore, Severity
-from autolyse.insights import InsightEngine
 from autolyse.target_aware import TargetAnalyzer
 
 

@@ -1,8 +1,6 @@
 """Tests for utils: type detection, feature engineering, insight fallbacks."""
 
-import numpy as np
 import pandas as pd
-import pytest
 
 from autolyse.utils import DataPreparation, FeatureEngineer, GeminiInsights
 

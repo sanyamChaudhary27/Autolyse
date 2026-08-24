@@ -8,7 +8,7 @@ snippet that resolves it - plus an explainable weighted health score.
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
 import numpy as np
 import pandas as pd
